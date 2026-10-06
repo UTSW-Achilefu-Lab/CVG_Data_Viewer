@@ -1,0 +1,6 @@
+# Image Display & Data Processing
+matplotlib>=3.5.0
+numpy>=1.21.0
+
+# DICOM Medical Image Support
+pydicom>=2.3.0
