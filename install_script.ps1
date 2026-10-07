@@ -18,10 +18,10 @@ Write-Output "Creating Python virtual environment for CVG data viewer"
 
 $venvRoot = Join-Path $HOME "Virtual_Enviornment"
 $venvPath = Join-Path $venvRoot "Image_Processing_Venv"
-$workPath = "D:\WorkFolder\CVG_Data_Viewer"
+$workPath = Join-Path $(Get-Location).path "\CVG_Data_Viewer"
 New-Item -ItemType Directory -Path $venvRoot -Force | Out-Null
 
-Write-Output "Creating python virtual environment : Image_Processing_Venv"
+Write-Output "Creating python virtual environment : $venvRoot\Image_Processing_Venv"
 python -m venv $venvPath
 
 & (Join-Path $venvPath "Scripts\Activate.ps1")
