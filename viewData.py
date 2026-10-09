@@ -107,7 +107,7 @@ class SnapshotDCMViewer:
     def __init__(self, sequences):
         self.sequences = sequences
         self.current_idx = 0
-        self.show_dcm = False
+        self.show_dcm = True
 
         self.fig, self.axes = plt.subplots(2, 4, figsize=(18, 9))
         self.fig.canvas.mpl_connect('key_press_event', self.on_key)
