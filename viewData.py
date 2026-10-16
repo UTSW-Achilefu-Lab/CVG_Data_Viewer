@@ -1,4 +1,4 @@
-# viewData.py — Updated with GUI Folder Selector (Tkinter)
+# viewData.py — Universal Snapshot Viewer for DICOM & Raw Bayer
 import os
 import sys
 import numpy as np
@@ -25,7 +25,7 @@ def select_folder_gui():
     folder_selected = filedialog.askdirectory(
         title="Select Folder Containing Snapshot Images"
     )
-    
+
     root.destroy()
     return folder_selected if folder_selected else None
 
@@ -81,14 +81,18 @@ def group_snapshots(directory):
     for full_path in file_paths:
         f = os.path.basename(full_path)
         name_without_ext, ext = os.path.splitext(f)
-        ext = ext.lstrip('.').lower()
         parts = name_without_ext.split('_')
+        ext = ext.lstrip('.').lower()
 
-        # Split format: Snap_TIMESTAMP_CAV_STATE_SEQ_CAMTYPE
-        if len(parts) >= 6:
-            state = parts[3]     # LasOn or LasOff
-            seq_num = parts[4]   # Sequence number
-            cam_type = parts[5]  # 0IMPROC, 0RAW, 1RAW, COMPRAW
+        if len(parts) >= 5:
+            cam_type = parts[-1]
+            seq_num = parts[-2]
+            
+            # Universal state parser: handles both single-word (LasOn) and two-word states (NIR_ON)
+            if parts[-3].upper() in ('ON', 'OFF'):
+                state = f"{parts[-4]}_{parts[-3]}"
+            else:
+                state = parts[-3]
 
             if seq_num not in sequences:
                 sequences[seq_num] = {}
@@ -116,6 +120,11 @@ class SnapshotDCMViewer:
     def update_display(self):
         seq_num, slots = self.sequences[self.current_idx]
 
+        # Dynamically resolve active ON/OFF states present in this sequence's files
+        available_states = set(k.rsplit('_', 2)[0] for k in slots.keys())
+        on_state = next((s for s in available_states if 'ON' in s.upper()), 'LasOn')
+        off_state = next((s for s in available_states if 'OFF' in s.upper()), 'LasOff')
+
         mode_str = "DICOM (.dcm)" if self.show_dcm else "Raw Bayer (.brcm)"
         self.fig.suptitle(
             f"Snapshot Sequence #{seq_num} ({self.current_idx + 1}/{len(self.sequences)}) — Viewing: {mode_str}\n"
@@ -123,15 +132,15 @@ class SnapshotDCMViewer:
             fontsize=12, fontweight='bold'
         )
 
-        # 7-Slot layout mapping
+        # 7-Slot layout mapping using dynamically detected states
         layout = [
-            (0, 0, 'LasOn_0IMPROC',  'Processed Infrared Frame Cam0', False),
-            (0, 1, 'LasOn_0RAW',     'Laser ON - Infrared Frame Cam0 [RAW]', False),
-            (0, 2, 'LasOn_1RAW',     'Laser ON - Visible Frame Cam1 [RAW]', False),
-            (0, 3, 'LasOn_COMPRAW',  'Laser ON - Composite Overlay Frames VIS | IR', True),  # Always DCM
-            (1, 0, 'LasOff_0IMPROC', 'Laser OFF - Infrared Frame Cam0', False),
-            (1, 1, 'LasOff_0RAW',    'Laser OFF - Infrared Frame Cam0 [RAW]', False),
-            (1, 2, 'LasOff_1RAW',    'Laser OFF - Visible Frame Cam1 [RAW]', False),
+            (0, 0, f'{on_state}_0IMPROC',  'Processed Infrared Frame Cam0', False),
+            (0, 1, f'{on_state}_0RAW',     f'{on_state} - Infrared Frame Cam0 [RAW]', False),
+            (0, 2, f'{on_state}_1RAW',     f'{on_state} - Visible Frame Cam1 [RAW]', False),
+            (0, 3, f'{on_state}_COMPRAW',  f'{on_state} - Composite Overlay Frames VIS | IR', True),  # Always DCM
+            (1, 0, f'{off_state}_0IMPROC', 'Processed Infrared Frame Cam0 (Off)', False),
+            (1, 1, f'{off_state}_0RAW',    f'{off_state} - Infrared Frame Cam0 [RAW]', False),
+            (1, 2, f'{off_state}_1RAW',    f'{off_state} - Visible Frame Cam1 [RAW]', False),
         ]
 
         # Reset all 8 axes
@@ -143,8 +152,7 @@ class SnapshotDCMViewer:
         # Populate defined 7 slots
         for row, col, base_key, label, always_dcm in layout:
             ax = self.axes[row, col]
-            
-            # If slot is COMPRAW, override target_ext to 'dcm'
+
             target_ext = 'dcm' if (self.show_dcm or always_dcm) else 'brcm'
             key = f"{base_key}_{target_ext}"
 
@@ -188,14 +196,11 @@ class SnapshotDCMViewer:
 
 
 def main():
-    # 1. Use command-line path if provided
     if len(sys.argv) > 1:
         target_dir = sys.argv[1]
-    # 2. Otherwise, prompt user with GUI Folder Picker
     else:
         target_dir = select_folder_gui()
 
-    # Exit if user cancels folder selection dialog
     if not target_dir:
         print("No directory selected. Exiting.")
         return
@@ -214,4 +219,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
